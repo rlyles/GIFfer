@@ -6,6 +6,7 @@ const fetch = require('node-fetch');
 const Registry = require('winreg');
 const { exec } = require('child_process');
 const chokidar = require('chokidar');
+const sharp = require('sharp');
 
 const documentsPath = app.getPath('documents');
 const GIFS_FOLDER = path.join(documentsPath, 'GIFfer', 'gifs');
@@ -317,32 +318,19 @@ ipcMain.handle('open-gifs-folder', async () => {
 
 ipcMain.handle('copyToClipboard', async (_, filename) => {
     try {
-        const sourcePath = path.join(GIFS_FOLDER, filename);
-        const tempDir = path.join(os.tmpdir(), 'giffer');
+        const filePath = path.join(GIFS_FOLDER, filename);
+        console.log('Processing GIF:', filePath);
+
+        const pngBuffer = await sharp(filePath)
+            .toFormat('png')
+            .toBuffer();
+
+        const image = nativeImage.createFromBuffer(pngBuffer);
         
-        await fs.ensureDir(tempDir);
-        await fs.chmod(tempDir, 0o777);
+        clipboard.writeImage(image);
         
-        const tempPath = path.join(tempDir, filename);
-        
-        await fs.copy(sourcePath, tempPath, { overwrite: true });
-        
-        const powershellCommand = `powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile('${tempPath.replace(/\\/g, '\\\\')}'))"`
-        
-        return new Promise((resolve) => {
-            exec(powershellCommand, (error) => {
-                if (error) {
-                    console.error('PowerShell error:', error);
-                    resolve({ success: false, error: error.message });
-                } else {
-                    console.log('Copied GIF to clipboard:', filename);
-                    resolve({ success: true });
-                }
-                
-                fs.remove(tempPath)
-                    .catch(err => console.error('Error cleaning up temp file:', err));
-            });
-        });
+        console.log('Processed and copied GIF as PNG');
+        return { success: true };
     } catch (error) {
         console.error('Clipboard error:', error);
         return { success: false, error: error.message };
