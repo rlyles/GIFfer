@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIFfer</title>
+    <link rel="stylesheet" href="src/assets/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>GIFfer</h1>
+        
+        <div id="search-container">
+            <input 
+                type="text" 
+                id="search-input" 
+                placeholder="...?"
+                autocomplete="off"
+            >
+            <button id="reset-button">Reset</button>
+            <button id="open-folder-button" class="folder-button">Open GIFs Folder</button>
+        </div>
+
+        <div id="gif-gallery"></div>
+
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h2>Edit Tags</h2>
+                <p id="modal-filename"></p>
+                <input type="text" id="modal-tags-input" placeholder="Enter tags, separated by commas">
+                <button id="save-tags-button">Save Tags</button>
+            </div>
+        </div>
+
+        <div id="notification" class="notification"></div>
+    </div>
+
+    <script src="src/assets/renderer.js"></script>
+</body>
+</html>
