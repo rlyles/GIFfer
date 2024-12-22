@@ -5,7 +5,6 @@ const os = require('os');
 const fetch = require('node-fetch');
 const Registry = require('winreg');
 const { exec } = require('child_process');
-const os = require('os');
 const chokidar = require('chokidar');
 
 const documentsPath = app.getPath('documents');
