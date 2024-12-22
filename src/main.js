@@ -5,6 +5,7 @@ const os = require('os');
 const fetch = require('node-fetch');
 const Registry = require('winreg');
 const { exec } = require('child_process');
+const os = require('os');
 const chokidar = require('chokidar');
 
 const documentsPath = app.getPath('documents');
@@ -320,14 +321,13 @@ ipcMain.handle('copyToClipboard', async (_, filename) => {
         const sourcePath = path.join(GIFS_FOLDER, filename);
         const tempDir = path.join(os.tmpdir(), 'giffer');
         
-        // Ensure temp directory exists
         await fs.ensureDir(tempDir);
         await fs.chmod(tempDir, 0o777);
         
         const tempPath = path.join(tempDir, filename);
-        await fs.copy(sourcePath, tempPath);
-
-        // Use PowerShell to handle the clipboard operation
+        
+        await fs.copy(sourcePath, tempPath, { overwrite: true });
+        
         const powershellCommand = `powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::SetImage([System.Drawing.Image]::FromFile('${tempPath.replace(/\\/g, '\\\\')}'))"`
         
         return new Promise((resolve) => {
@@ -340,10 +340,8 @@ ipcMain.handle('copyToClipboard', async (_, filename) => {
                     resolve({ success: true });
                 }
                 
-                // Clean up temp file
-                fs.remove(tempPath).catch(err => 
-                    console.error('Error cleaning up temp file:', err)
-                );
+                fs.remove(tempPath)
+                    .catch(err => console.error('Error cleaning up temp file:', err));
             });
         });
     } catch (error) {
