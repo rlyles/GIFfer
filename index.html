@@ -17,7 +17,7 @@
                 placeholder="...?"
                 autocomplete="off"
             >
-            <button id="reset-button">Reset</button>
+            <button id="reset-button">Refresh</button>
             <button id="open-folder-button" class="folder-button">Open GIFs Folder</button>
         </div>
 
@@ -36,6 +36,86 @@
         <div id="notification" class="notification"></div>
     </div>
 
-    <script src="src/assets/renderer.js"></script>
+    <script src="src/assets/renderer.js">
+
+    const TAGS_URL = './tags.json';
+
+    const GIFS_FOLDER = './gifs/';
+
+    let tagsData = {};
+
+// Function to fetch and display GIFs
+const fetchAndDisplayGIFs = () => {
+  fetch(TAGS_URL)
+    .then(response => response.json())
+    .then(data => {
+      tagsData = data;
+      displayGIFs(tagsData);
+    })
+    .catch(error => {});
+};
+
+// Initial fetch
+fetchAndDisplayGIFs();
+
+function displayGIFs(data) {
+  const gallery = document.getElementById('gif-gallery');
+  gallery.innerHTML = ''; 
+
+  for (const [filename, tags] of Object.entries(data)) {
+    const gifDiv = document.createElement('div');
+    gifDiv.classList.add('gif-item');
+
+    const img = document.createElement('img');
+    img.src = GIFS_FOLDER + filename;
+    img.alt = filename;
+
+    const tagsDiv = document.createElement('div');
+    tagsDiv.classList.add('tags');
+
+    tags.forEach(tag => {
+      const tagSpan = document.createElement('span');
+      tagSpan.classList.add('tag');
+      tagSpan.textContent = tag;
+      tagsDiv.appendChild(tagSpan);
+    });
+
+    gifDiv.appendChild(img);
+    gifDiv.appendChild(tagsDiv);
+    gallery.appendChild(gifDiv);
+  }
+}
+
+document.getElementById('search-button').addEventListener('click', () => {
+  const searchTerm = document.getElementById('search-input').value.trim().toLowerCase();
+  if (searchTerm === '') {
+    alert('Please enter a tag to search.');
+    return;
+  }
+
+  const filteredData = {};
+  for (const [filename, tags] of Object.entries(tagsData)) {
+    if (tags.map(tag => tag.toLowerCase()).includes(searchTerm)) {
+      filteredData[filename] = tags;
+    }
+  }
+
+  displayGIFs(filteredData);
+});
+
+document.getElementById('reset-button').addEventListener('click', () => {
+  document.getElementById('search-input').value = '';
+  fetchAndDisplayGIFs();
+});
+
+document.getElementById('search-input').addEventListener('keyup', function(event) {
+  if (event.key === 'Enter') {
+    document.getElementById('search-button').click();
+  }
+});
+
+setInterval(fetchAndDisplayGIFs, 5000);
+</script>
+    
 </body>
 </html>

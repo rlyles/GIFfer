@@ -5,7 +5,7 @@
     "productName": "GIFfer",
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico"
+      "icon": "icon.ico"
     },
     "files": [
       "**/*"
