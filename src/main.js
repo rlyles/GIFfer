@@ -4,16 +4,39 @@ const path = require('path');
 const os = require('os');
 const fetch = require('node-fetch');
 const Registry = require('winreg');
-const { exec } = require('child_process');
+
+
 const chokidar = require('chokidar');
-const sharp = require('sharp');
 
 const documentsPath = app.getPath('documents');
+const Downloads = app.getPath('downloads')
 const GIFS_FOLDER = path.join(documentsPath, 'GIFfer', 'gifs');
 const TAGS_FILE = path.join(documentsPath, 'GIFfer', 'tags.json');
 
+const addGifToTags = async (filename) => {
+    const ext = path.extname(filename).toLowerCase();
+    if (ext !== '.gif') return;
+
+    if (!tagsData[filename]) {
+        tagsData[filename] = [];
+        await fs.writeJson(TAGS_FILE, tagsData, { spaces: 2 });
+      }
+    };
+
+const removeGifFromTags = async (filename) => {
+    if (tagsData[filename]) {
+        delete tagsData[filename];
+        await fs.writeJson(TAGS_FILE, tagsData, { spaces: 2 });
+      }
+    };
+
 let mainWindow = null;
 let tagsData = {};
+if (fs.existsSync(TAGS_FILE)) {
+    tagsData = fs.readJsonSync(TAGS_FILE);
+  } else {
+    fs.writeJsonSync(TAGS_FILE, tagsData, { spaces: 2 });
+  }
 let tray = null; 
 
 function ensureDirectories() {
@@ -23,33 +46,38 @@ function ensureDirectories() {
         if (!fs.existsSync(TAGS_FILE)) {
             fs.writeJsonSync(TAGS_FILE, {}, { spaces: 2 });
         }
-        console.log('Directories created:', GIFS_FOLDER);
-        console.log('Tags file location:', TAGS_FILE);
-    } catch (error) {
-        console.error('Error creating directories:', error);
-    }
+
+    } catch (error) {}
 }
 
 const ensurePermissions = async () => {
     try {
-
         await fs.ensureDir(GIFS_FOLDER);
         await fs.chmod(GIFS_FOLDER, 0o777);
-        
+ 
         if (fs.existsSync(TAGS_FILE)) {
             await fs.chmod(TAGS_FILE, 0o666);
         }
-        
+
         const tempDir = path.join(os.tmpdir(), 'giffer');
         await fs.ensureDir(tempDir);
         await fs.chmod(tempDir, 0o777);
-        
-        console.log('Permissions set successfully');
-    } catch (error) {
-        console.error('Permission setup error:', error);
-    }
+    } catch (error) {}
 };
 
+const ensureTempAccess = async () => {
+    try {
+        const tempDir = path.join(os.tmpdir(), 'giffer');
+        
+        if (fs.existsSync(tempDir)) {
+            await fs.remove(tempDir);
+        }
+        
+        await fs.ensureDir(tempDir, { mode: 0o777 });
+        await fs.chmod(tempDir, 0o777);
+
+    } catch (error) {}
+};
 
 function createTray() {
     try {
@@ -57,15 +85,9 @@ function createTray() {
         
         if (app.isPackaged) {
             iconPath = path.join(app.getPath('exe'), '..', 'resources', 'build', 'icon.ico');
-            console.log('Production icon path:', iconPath);
-            console.log('App path:', app.getPath('exe'));
-            console.log('Resources path:', process.resourcesPath);
         } else {
             iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
-            console.log('Development icon path:', iconPath);
         }
-
-        console.log('Icon exists?', fs.existsSync(iconPath));
         
         if (!fs.existsSync(iconPath)) {
             const alternateLocations = [
@@ -76,25 +98,18 @@ function createTray() {
             ];
 
             for (const altPath of alternateLocations) {
-                console.log('Checking alternate path:', altPath);
-                console.log('Exists?', fs.existsSync(altPath));
                 if (fs.existsSync(altPath)) {
                     iconPath = altPath;
-                    console.log('Found icon at:', altPath);
                     break;
                 }
             }
         }
 
         if (!fs.existsSync(iconPath)) {
-            console.error('No icon file found!');
             return;
         }
 
-        console.log('Creating tray with final icon path:', iconPath);
-
         tray = new Tray(iconPath);
-        console.log('Tray created successfully');
 
         const contextMenu = Menu.buildFromTemplate([
             {
@@ -135,28 +150,10 @@ function createTray() {
             }
         });
 
-        console.log('Tray setup completed');
-
-    } catch (error) {
-        console.error('Error creating tray:', error);
-        console.error('Error stack:', error.stack);
-    }
+    } catch (error) {}
 }
 
 app.whenReady().then(async () => {
-
-    console.log('App paths:');
-    console.log('Exe path:', app.getPath('exe'));
-    console.log('App path:', app.getAppPath());
-    console.log('Resources path:', process.resourcesPath);
-    console.log('Current directory:', process.cwd());
-    console.log('GIFS_FOLDER path:', GIFS_FOLDER);
-    
-    await ensureDirectories();
-    await ensurePermissions();
-    await initializeTagsData();
-    const watcher = setupWatcher();
-    createWindow();
     createTray();
 });
 
@@ -165,11 +162,8 @@ function cleanupTempFiles() {
         const tempDir = path.join(os.tmpdir(), 'giffer');
         if (fs.existsSync(tempDir)) {
             fs.emptyDirSync(tempDir);
-            console.log('Cleaned up temp directory:', tempDir);
         }
-    } catch (error) {
-        console.error('Error cleaning up temp directory:', error);
-    }
+    } catch (error) {}
 }
 
 function createWindow() {
@@ -186,9 +180,6 @@ function createWindow() {
         frame: true           
     });
 
-    mainWindow.webContents.openDevTools();
-
-
     mainWindow.on('minimize', (event) => {
       event.preventDefault();
       mainWindow.hide();
@@ -203,22 +194,15 @@ function createWindow() {
 });
 
     const indexPath = path.join(__dirname, '..', 'index.html');
-    console.log('Loading index.html from:', indexPath);
     
     mainWindow.loadFile(indexPath).catch(error => {
-        console.error('Error loading index.html:', error);
     });
 
     mainWindow.webContents.on('did-fail-load', (_, code, description) => {
-        console.error('Failed to load:', code, description);
     });
 
     mainWindow.webContents.on('dom-ready', () => {
-        console.log('DOM ready');
     });
-
-    // Open DevTools for debugging (uncomment if needed)
-    // mainWindow.webContents.openDevTools();
 
     mainWindow.on('closed', () => {
         mainWindow = null;
@@ -233,46 +217,81 @@ async function initializeTagsData() {
             tagsData = {};
             await fs.writeJson(TAGS_FILE, tagsData, { spaces: 2 });
         }
-    } catch (error) {
-        console.error('Error initializing tags data:', error);
-        tagsData = {};
-    }
+    } catch (error) {}
 }
 
-function setupWatcher() {
-    const watcher = chokidar.watch(GIFS_FOLDER, {
-        ignored: /(^|[\/\\])\../,
-        persistent: true,
-        awaitWriteFinish: true
-    });
+    const initializeTags = async () => {
+        const files = await fs.readdir(GIFS_FOLDER);
+        for (const file of files) {
+          const ext = path.extname(file).toLowerCase();
+          if (ext === '.gif' && !tagsData[file]) {
+            tagsData[file] = [];
+          }
+        }
+        await fs.writeJson(TAGS_FILE, tagsData, { spaces: 2 });
+      };
+      
+      initializeTags().then(() => {});
 
-    watcher
-        .on('add', async (filepath) => {
+      function setupWatcher() {
+        const watcher = chokidar.watch(GIFS_FOLDER, {
+          ignored: /(^|[\/\\])\../,
+          persistent: true,
+          ignoreInitial: true,
+          depth: 0,
+          awaitWriteFinish: { stabilityThreshold: 2000, pollInterval: 100 },
+        });
+      
+        watcher.on('add', async (filepath) => {
+          try {
             const filename = path.basename(filepath);
             if (path.extname(filename).toLowerCase() === '.gif') {
-                console.log('New GIF detected:', filename);
-                if (!tagsData[filename]) {
-                    tagsData[filename] = [];
-                    await fs.writeJson(TAGS_FILE, tagsData, { spaces: 2 });
-                    if (mainWindow) {
-                        mainWindow.webContents.send('tags-updated', tagsData);
-                    }
-                }
+              addGifToTags(filename);
+              mainWindow.webContents.send('refresh-gallery'); 
             }
-        })
-        .on('unlink', async (filepath) => {
-            const filename = path.basename(filepath);
-            if (tagsData[filename]) {
-                delete tagsData[filename];
-                await fs.writeJson(TAGS_FILE, tagsData, { spaces: 2 });
-                if (mainWindow) {
-                    mainWindow.webContents.send('tags-updated', tagsData);
-                }
-            }
+          } catch (error) {}
         });
+      
+        watcher.on('change', async (filepath) => {
+          try {
+            const filename = path.basename(filepath);
+            if (path.extname(filename).toLowerCase() === '.gif') {
+              addGifToTags(filename);
+              mainWindow.webContents.send('refresh-gallery'); 
+            }
+          } catch (error) {}
+        });
+      
+        return watcher;
+      }
 
-    return watcher;
-}
+      function setupDownloadsWatcher() {
+        const downloadsPath = app.getPath('downloads');
+        const watcher = chokidar.watch(downloadsPath, {
+          ignored: /(^|[\/\\])\../, 
+          persistent: true, 
+          awaitWriteFinish: true, 
+        });
+      
+        watcher.on('add', async (filepath) => {
+          try {
+            const filename = path.basename(filepath);
+            if (path.extname(filename).toLowerCase() === '.gif') {
+              const destination = path.join(GIFS_FOLDER, filename);
+
+              setTimeout(async () => {
+                try {
+                  await fs.move(filepath, destination, { overwrite: true });
+                  addGifToTags(filename); 
+                } catch (moveError) {
+                }
+              }, 1000); 
+            }
+          } catch (error) {}
+        });
+      
+        return watcher;
+      }
 
 ipcMain.handle('get-tags', async () => {
     return tagsData;
@@ -285,10 +304,7 @@ ipcMain.handle('delete-gif', async (_, filename) => {
         delete tagsData[filename];
         await fs.writeJson(TAGS_FILE, tagsData, { spaces: 2 });
         return { success: true };
-    } catch (error) {
-        console.error('Error deleting file:', error);
-        return { success: false, error: error.message };
-    }
+    } catch (error) {}
 });
 
 ipcMain.handle('update-tags', async (_, data) => {
@@ -296,10 +312,7 @@ ipcMain.handle('update-tags', async (_, data) => {
         tagsData[data.filename] = data.tags;
         await fs.writeJson(TAGS_FILE, tagsData, { spaces: 2 });
         return { success: true };
-    } catch (error) {
-        console.error('Error updating tags:', error);
-        return { success: false, error: error.message };
-    }
+    } catch (error) {}
 });
 
 ipcMain.handle('get-gif-path', (_, filename) => {
@@ -310,31 +323,33 @@ ipcMain.handle('open-gifs-folder', async () => {
     try {
         await require('electron').shell.openPath(GIFS_FOLDER);
         return { success: true };
-    } catch (error) {
-        console.error('Error opening GIFs folder:', error);
-        return { success: false, error: error.message };
-    }
+    } catch (error) {}
 });
 
 ipcMain.handle('copyToClipboard', async (_, filename) => {
     try {
-        const filePath = path.join(GIFS_FOLDER, filename);
-        console.log('Processing GIF:', filePath);
-
-        const pngBuffer = await sharp(filePath)
-            .toFormat('png')
-            .toBuffer();
-
-        const image = nativeImage.createFromBuffer(pngBuffer);
+        const sourcePath = path.join(GIFS_FOLDER, filename);
+        const tempDir = path.join(os.tmpdir(), 'giffer');
         
-        clipboard.writeImage(image);
+        await ensureTempAccess();
         
-        console.log('Processed and copied GIF as PNG');
-        return { success: true };
-    } catch (error) {
-        console.error('Clipboard error:', error);
-        return { success: false, error: error.message };
-    }
+        const tempPath = path.join(tempDir, filename);
+        await fs.copy(sourcePath, tempPath);
+
+        const { exec } = require('child_process');
+        const powershellCommand = `powershell -command "Set-Clipboard -Path '${tempPath}'"`;
+
+        return new Promise((resolve) => {
+            exec(powershellCommand, (error) => {
+                if (error) {}
+            });
+        });
+    } catch (error) {}
+});
+
+ipcMain.handle('refresh-gallery', async () => { 
+    await fetchAndDisplayGIFs();
+    return true; 
 });
 
 function handleArguments() {
@@ -349,31 +364,6 @@ function handleArguments() {
     }
 }
 
-function createContextMenu() {
-    try {
-        const { execSync } = require('child_process');
-        const exePath = app.getPath('exe').replace(/\\/g, '\\\\');
-        
-        const commands = [
-            `reg add "HKCU\\Software\\Classes\\.gif\\shell\\AddToGIFfer" /ve /d "Add to GIFfer" /f`,
-            `reg add "HKCU\\Software\\Classes\\.gif\\shell\\AddToGIFfer\\command" /ve /d "\\"${exePath}\\" \\"%1\\"" /f`
-        ];
-
-        commands.forEach(cmd => {
-            try {
-                execSync(cmd);
-                console.log(`Successfully executed: ${cmd}`);
-            } catch (cmdError) {
-                console.error(`Failed to execute command: ${cmd}`, cmdError);
-            }
-        });
-
-        console.log('Context menu registration completed');
-    } catch (error) {
-        console.error('Error creating context menu:', error);
-    }
-}
-
 function handleArguments() {
     const filePath = process.argv[1];
     if (filePath && path.extname(filePath).toLowerCase() === '.gif') {
@@ -383,13 +373,17 @@ function handleArguments() {
     }
 }
 
+
+
 app.whenReady().then(async () => {
     ensureDirectories();
+    await ensurePermissions();
     await initializeTagsData();
+    await ensureTempAccess();
     const watcher = setupWatcher();
+    const downloadsWatcher = setupDownloadsWatcher();
     createWindow();
     createTray();
-    createContextMenu();
     handleArguments();
 
     setTimeout(() => {
@@ -453,9 +447,7 @@ if (!gotTheLock) {
 });
 
 process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
 });
 
 process.on('unhandledRejection', (error) => {
-    console.error('Unhandled Rejection:', error);
 });
