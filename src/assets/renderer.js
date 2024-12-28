@@ -34,10 +34,13 @@ async function fetchAndDisplayGIFs() {
         await displayGIFs(tagsData);
 
         document.getElementById('search-input').focus();
-    } catch (error) {
-        console.error('Error fetching tags:', error);
-        showNotification('Error loading GIFs', 'error');
-    }
+    } catch (error) {}
+}
+
+async function refreshGallery() {
+    try {
+        const success = await window.electronAPI.refreshGallery();
+    } catch (error) {} 
 }
 
 async function displayGIFs(data) {
@@ -71,14 +74,8 @@ async function displayGIFs(data) {
                     const result = await window.electronAPI.copyToClipboard(filename);
                     if (result.success) {
                         showNotification('GIF copied to clipboard!');
-                    } else {
-                        showNotification('Failed to copy GIF');
-                        console.error('Copy failed:', result.error);
-                    }
-                } catch (error) {
-                    console.error('Error copying to clipboard:', error);
-                    showNotification('Failed to copy GIF');
-                }
+                    } else {}
+                } catch (error) {}
             });
 
             img.title = 'Click to copy to clipboard';
@@ -122,12 +119,10 @@ async function displayGIFs(data) {
             controlsDiv.appendChild(editButton);
             controlsDiv.appendChild(deleteButton);
 
+
             gallery.appendChild(gifDiv);
 
-        } catch (error) {
-            console.error(`Error loading GIF: ${filename}`, error);
-            continue;
-        }
+        } catch (error) {}
     }
 }
 
@@ -142,10 +137,7 @@ async function deleteGIF(filename) {
             } else {
                 showNotification('Error deleting GIF', 'error');
             }
-        } catch (error) {
-            console.error('Error deleting GIF:', error);
-            showNotification('Failed to delete GIF', 'error');
-        }
+        } catch (error) {}
     }
 }
 
@@ -162,7 +154,7 @@ const filterGIFs = debounce(async (searchTerm) => {
 
     const filteredData = Object.entries(tagsData)
         .filter(([filename, tags]) => 
-            tags.some(tag => tag.toLowerCase().includes(searchTerm)) //||
+            tags.some(tag => tag.toLowerCase().includes(searchTerm))
         )
         .reduce((obj, [key, value]) => {
             obj[key] = value;
@@ -197,7 +189,9 @@ function openEditModal(filename, tags) {
     };
 }
 
+// Modify the existing event listener in the keyboard shortcuts section
 document.addEventListener('keydown', (e) => {
+
     if (e.key === 'Escape' && modal.style.display === 'block') {
         modal.style.display = 'none';
     }
@@ -249,10 +243,7 @@ saveTagsButton.addEventListener('click', async () => {
         modal.style.display = 'none';
         await fetchAndDisplayGIFs();
         showNotification('Tags updated successfully', 'success');
-    } catch (error) {
-        console.error('Error updating tags:', error);
-        showNotification('Failed to update tags', 'error');
-    }
+    } catch (error) {}
 });
 
 // ===== Button Handlers =====
@@ -264,10 +255,7 @@ document.getElementById('reset-button').addEventListener('click', () => {
 document.getElementById('open-folder-button').addEventListener('click', async () => {
     try {
         await window.electronAPI.openGifsFolder();
-    } catch (error) {
-        console.error('Error opening folder:', error);
-        showNotification('Could not open GIFs folder', 'error');
-    }
+    } catch (error) {}
 });
 
 document.addEventListener('contextmenu', (e) => {
@@ -280,6 +268,7 @@ document.addEventListener('contextmenu', (e) => {
 
 // ===== Keyboard Shortcuts =====
 document.addEventListener('keydown', (e) => {
+
     if (e.key === 'Escape' && modal.style.display === 'block') {
         modal.style.display = 'none';
     }
@@ -302,7 +291,9 @@ window.electronAPI.onWindowShown(() => {
 // ===== Initialize Application =====
 fetchAndDisplayGIFs();
 
+// Optional: Add window resize handler for responsive layouts
 window.addEventListener('resize', debounce(() => {
+
     const gallery = document.getElementById('gif-gallery');
     if (window.innerWidth < 768) {
         gallery.classList.add('mobile-layout');
